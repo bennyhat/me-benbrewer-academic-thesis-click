@@ -82,6 +82,9 @@ ETXMetric::get_link_metric(const EtherAddress &e, bool) const
   unsigned val = (100 * 100 * 100) / (r_fwd * r_rev);
   assert(val >= 100);
 
+  click_chatter("%u : %s::%s %s returning metric ETX of %u for destination %s", (unsigned) Timestamp::now ().msecval(), name().c_str(),
+              "get_link_metric" , _ls->_eth.unparse().c_str(), val, e.unparse().c_str());
+
   return metric_t(val);
 }
 

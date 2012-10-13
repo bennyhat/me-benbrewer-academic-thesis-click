@@ -2482,8 +2482,10 @@ Router::sim_incoming_packet(int ifid, int ptype, const unsigned char* data,
 			    int len, simclick_simpacketinfo* pinfo) {
   if (Vector<int> *vec = sim_listenvec(ifid))
     for (int i = 1; i < vec->size(); i++)
+      {
       ((FromSimDevice *)element((*vec)[i]))->incoming_packet(ifid, ptype, data,
 							     len, pinfo);
+      }
   return 0;
 }
 

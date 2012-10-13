@@ -1,0 +1,2 @@
+ELEMENT_CHECKSUM=61d89f26114080519e61b8c4e6679070
+ELEMENT_CHECKSUMCOMMAND=LC_ALL=C ls -1R  ../elements/ns ../elements/userlevel ../elements/analysis ../elements/app ../elements/aqm ../elements/ethernet ../elements/grid ../elements/icmp ../elements/ip ../elements/simple ../elements/standard ../elements/tcpudp ../elements/test ../elements/threads | md5sum | sed 's/[^0-9a-f].*//'

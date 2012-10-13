@@ -22,8 +22,8 @@
 #include <clicknet/ether.h>
 #include <clicknet/ip.h>
 #include <click/standard/scheduleinfo.hh>
-#include <click/router.hh>
 #include <click/element.hh>
+#include <click/router.hh>
 #include <click/glue.hh>
 #include <click/straccum.hh>
 #include <click/packet_anno.hh>
@@ -280,7 +280,7 @@ DSDVRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-DSDVRouteTable::initialize(ErrorHandler *)
+DSDVRouteTable::initialize(ErrorHandler * errh)
 {
   _hello_timer.initialize(this);
   _hello_timer.schedule_after_msec(_period);
@@ -385,6 +385,10 @@ DSDVRouteTable::insert_route(const RTEntry &r, const GridGenericLogger::reason_t
     _old_rtes.insert(r.dest_ip, *old_r);
 #endif
 
+  #if DBG
+      click_chatter("%s:%s XXX inserting new route to %s as %s \n", name().c_str(), _ip.unparse().c_str(),
+                    r.dest_ip.unparse().c_str(), r.dest_eth.unparse().c_str());
+  #endif
   _rtes.insert(r.dest_ip, r);
 
   // note, we don't change any pending triggered update for this
@@ -452,6 +456,7 @@ DSDVRouteTable::expire_hook(const IPAddress &ip)
     }
   }
 
+  //click_chatter("expire hook - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
 
   for (int i = 0; i < expired_dests.size(); i++) {
@@ -519,6 +524,7 @@ DSDVRouteTable::schedule_triggered_update(const IPAddress &ip, unsigned int when
   HookPair *hp = new HookPair(this, ip);
   Timer *t = new Timer(static_trigger_hook, (void *) hp);
   t->initialize(this);
+  //click_chatter("triggered update - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
   t->schedule_after_msec(jiff_to_msec(jiff > when ? 0 : when - jiff));
   _trigger_timers.insert(ip, t);
@@ -538,6 +544,7 @@ DSDVRouteTable::trigger_hook(const IPAddress &ip)
   HookPair **oldhp = _trigger_hooks.findp(ip);
   dsdv_assert(old && *old && !(*old)->scheduled() && oldhp && *oldhp);
 
+  //click_chatter("trigger hook - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
   unsigned int next_trigger_jiff = _last_triggered_update + msec_to_jiff(_min_triggered_update_period);
 
@@ -669,6 +676,7 @@ DSDVRouteTable::update_wst(RTEntry *old_r, RTEntry &new_r, unsigned int jiff)
 void
 DSDVRouteTable::update_metric(RTEntry &r)
 {
+
   dsdv_assert(r.num_hops() > 1);
 
   RTEntry *next_hop = _rtes.findp(r.next_hop_ip);
@@ -678,6 +686,11 @@ DSDVRouteTable::update_metric(RTEntry &r)
     r.metric = _bad_metric;
     return;
   }
+
+  /*click_chatter ("%u : %s::%s %s updating metric for destination %s using prepend of metric from next hop %s : %u + %u",
+      (unsigned) Timestamp::now().msecval(), "dsdv_rt", "update_metric",_eth.unparse().c_str(),
+      r.dest_ip.unparse().c_str(),next_hop->dest_ip.unparse().c_str(),
+      r.metric.val(),next_hop->metric.val());*/
 
 #if ENABLE_SEEN
   if (_use_seen && next_hop->metric.val() == _metric_seen) {
@@ -761,6 +774,7 @@ DSDVRouteTable::send_full_update()
 #if DBG
   click_chatter("%s: XXX sending full update\n", name().c_str());
 #endif
+  //click_chatter("update send - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
   Vector<RTEntry> routes;
 
@@ -821,6 +835,7 @@ DSDVRouteTable::send_triggered_update(const IPAddress &ip)
   RTEntry *r = _rtes.findp(ip);
   dsdv_assert(r);
 
+  //click_chatter("send triggered - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
 
   Vector<RTEntry> triggered_routes;
@@ -907,7 +922,7 @@ DSDVRouteTable::handle_update(RTEntry new_r, const bool was_sender, const unsign
     new_r.advertise_ok_jiffies = jiff;
 
 #if DBG
-  click_chatter("%s: XXX dest=%s advertise_ok_jiffies=%u wst=%u jiff=%d\n",
+  click_chatter("%u - %s: XXX dest=%s advertise_ok_jiffies=%u wst=%u jiff=%d\n", jiff,
 		name().c_str(), new_r.dest_ip.unparse().c_str(),
 		new_r.advertise_ok_jiffies, new_r.wst, jiff);
 #endif
@@ -918,7 +933,7 @@ DSDVRouteTable::handle_update(RTEntry new_r, const bool was_sender, const unsign
       new_r.need_metric_ad = true;
       schedule_triggered_update(new_r.dest_ip, new_r.advertise_ok_jiffies);
 #if DBG
-      click_chatter("%s: XXX scheduled brand-new route to %s to be advertised in %d jiffies from now\n", name().c_str(),
+      click_chatter("%u - %s: XXX scheduled brand-new route to %s to be advertised in %d jiffies from now\n", jiff, name().c_str(),
 		    new_r.dest_ip.unparse().c_str(), new_r.advertise_ok_jiffies - jiff);
 #endif
     }
@@ -988,6 +1003,7 @@ DSDVRouteTable::simple_action(Packet *packet)
   check_invariants();
 
   dsdv_assert(packet);
+  //click_chatter("simple action - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
 
   /*
@@ -1038,8 +1054,10 @@ DSDVRouteTable::simple_action(Packet *packet)
   // maybe add new route for message transmitter, sanity check existing entry
   RTEntry *r = _rtes.findp(ipaddr);
   if (!r)
-    click_chatter("DSDVRouteTable %s: new 1-hop nbr %s -- %s",
-		  name().c_str(), ipaddr.unparse().c_str(), ethaddr.unparse().c_str());
+    {
+    //click_chatter("%u - %s - DSDVRouteTable %s: new 1-hop nbr %s -- %s", jiff,
+    //		  name().c_str(), _ip.unparse().c_str(), ipaddr.unparse().c_str(), ethaddr.unparse().c_str());
+    }
   else if (r->dest_eth && r->dest_eth != ethaddr)
     click_chatter("DSDVRouteTable %s: ethernet address of %s changed from %s to %s",
 		  name().c_str(), ipaddr.unparse().c_str(), r->dest_eth.unparse().c_str(), ethaddr.unparse().c_str());
@@ -1441,6 +1459,7 @@ DSDVRouteTable::hello_hook()
 {
   unsigned int msecs_to_next_ad = _period;
 
+  //click_chatter("hello hook - %s",  _ip.unparse().c_str());
   unsigned int jiff = dsdv_jiffies();
   dsdv_assert(jiff >= _last_periodic_update);
   unsigned int msec_since_last = jiff_to_msec(jiff - _last_periodic_update);
@@ -1588,22 +1607,23 @@ DSDVRouteTable::RTEntry::dump() const
   unsigned int jiff = dsdv_jiffies();
 
   StringAccum sa;
-  sa << "  curr jiffies: "  << jiff << "\n"
-     << "       dest_ip: " << dest_ip.unparse() << "\n"
-     << "      dest_eth: " << dest_eth.unparse() << "\n"
-     << "   next_hop_ip: " << next_hop_ip.unparse() << "\n"
-     << "  next_hop_eth: " << next_hop_eth.unparse() << "\n"
-     << "next_hop_iface: " << next_hop_interface << "\n"
-     << "        seq_no: " << seq_no() << "\n"
-     << "      num_hops: " << (unsigned int) num_hops() << "\n"
-     << "  last_updated: " << jiff_diff_string(last_updated_jiffies, jiff) << "\n"
-     << "  last_expired: " << jiff_diff_string(last_expired_jiffies, jiff) << "\n"
-     << "      last_seq: " << jiff_diff_string(last_seq_jiffies, jiff) << "\n"
-     << "  advertise_ok: " << jiff_diff_string(advertise_ok_jiffies, jiff) << "\n"
-     << "        metric: " << metric.val() << "\n"
-     << "need_metric_ad: " << need_metric_ad << "\n"
-     << "   need_seq_ad: " << need_seq_ad << "\n"
-     << "           wst: " << (unsigned int) wst << "\n";
+  sa << "<route name='" << dest_ip.unparse().c_str() << "'>\n"
+     << "<field name='time'>"  << jiff << "</field>\n"
+     << "<field name='dest_ip'>" << dest_ip.unparse() << "</field>\n"
+     << "<field name='dest_eth'>" << dest_eth.unparse() << "</field>\n"
+     << "<field name='next_hop_ip'>" << next_hop_ip.unparse() << "</field>\n"
+     << "<field name='next_hop_eth'>" << next_hop_eth.unparse() << "</field>\n"
+     << "<field name='seq_no'>" << seq_no() << "</field>\n"
+     << "<field name='num_hops'>" << (unsigned int) num_hops() << "</field>\n"
+     << "<field name='last_updated'>" << jiff_diff_string(last_updated_jiffies, jiff) << "</field>\n"
+     << "<field name='last_expired'>" << jiff_diff_string(last_expired_jiffies, jiff) << "</field>\n"
+     << "<field name='last_seq'>" << jiff_diff_string(last_seq_jiffies, jiff) << "</field>\n"
+     << "<field name='advertise_ok'>" << jiff_diff_string(advertise_ok_jiffies, jiff) << "</field>\n"
+     << "<field name='metric'>" << metric.val() << "</field>\n"
+     << "<field name='need_metric_ad'>" << need_metric_ad << "</field>\n"
+     << "<field name='need_seq_ad'>" << need_seq_ad << "</field>\n"
+     << "<field name='wst'>" << (unsigned int) wst << "</field>\n"
+     << "</route>\n";
   return sa.take_string();
 }
 

@@ -138,8 +138,8 @@ public:
     link_entry(const unsigned char *);
     int write(unsigned char *) const;
   };
-
-private:
+  EtherAddress _eth;
+protected:
   unsigned int _window; // sequence numbers
   unsigned int _tau;    // msecs
   unsigned int _period; // msecs
@@ -147,7 +147,7 @@ private:
   unsigned int _probe_size; // bytes
 
   unsigned int _seq;
-  EtherAddress _eth;
+
 
 
   // record probes received from other hosts
@@ -204,7 +204,7 @@ private:
   void add_bcast_stat(const EtherAddress &, const link_probe &);
 
   static void static_send_hook(Timer *, void *e) { ((LinkStat *) e)->send_hook(); }
-  void send_hook();
+  virtual void send_hook();
 
   Timer *_send_timer;
 

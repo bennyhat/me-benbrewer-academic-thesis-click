@@ -54,6 +54,8 @@ GridEncap::configure(Vector<String> &conf, ErrorHandler *errh)
   _gh.type = grid_hdr::GRID_NBR_ENCAP;
   _gh.ip = _ip.addr();
   _gh.tx_ip = _ip.addr();
+
+  click_chatter("encapsulating with IP and Eth as %s and %s", _ip.unparse().c_str(),_eth.unparse().c_str());
   // _gh.total_len is set when packet is actually processed
   // _gh.cksum should be calculated by SetGridChecksum element
 

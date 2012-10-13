@@ -123,7 +123,9 @@ FromSimDevice::set_annotations(Packet *p,int ptype)
     // check if multicast
     // ! mcast => ! bcast
     if (!(p->data()[0] & 1))
-      return;
+      {
+        return;
+      }
 
     // check for bcast
     if (memcmp(bcast_addr, p->data(), 6) == 0)

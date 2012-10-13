@@ -217,7 +217,7 @@ public:
 
   void add_handlers();
 
-private:
+protected:
 
 #if SEQ_METRIC
   bool _use_seq_metric; // use the `dsdv_seqs' metric
@@ -226,11 +226,12 @@ private:
 
   typedef GridGenericMetric::metric_t metric_t;
 
+public:
   /*
    * route table entry
    */
   class RTEntry : public RouteEntry {
-  private:
+  protected:
     bool                _init;
 
   public:
@@ -262,7 +263,7 @@ private:
     bool good()   const { check(); return num_hops() != 0; }
 
     String dump()  const;
-    void   check() const {
+    virtual void   check() const {
       assert(_init);
       assert((num_hops() > 0) != (seq_no() & 1));
       assert((num_hops() != 1) || (dest_ip == next_hop_ip && dest_eth == next_hop_eth));
@@ -322,6 +323,7 @@ private:
 
   };
 
+protected:
   friend class RTEntry;
 
   typedef HashMap<IPAddress, RTEntry> RTable;
@@ -349,11 +351,11 @@ private:
 #endif
 
   // returns true if route entry was inserted into route table, else return false
-  bool handle_update(RTEntry, const bool was_sender, const unsigned int jiff);
+  virtual bool handle_update(RTEntry, const bool was_sender, const unsigned int jiff);
 
-  void insert_route(const RTEntry &, const GridGenericLogger::reason_t why);
+  virtual void insert_route(const RTEntry &, const GridGenericLogger::reason_t why);
   void schedule_triggered_update(const IPAddress &ip, unsigned int when); // when is in jiffies
-  bool lookup_route(const IPAddress &dest_ip, RTEntry &entry);
+  virtual bool lookup_route(const IPAddress &dest_ip, RTEntry &entry);
 
 
   typedef HashMap<IPAddress, Timer *> TMap;
@@ -363,7 +365,7 @@ private:
     DSDVRouteTable *obj;
     unsigned int ip;
     HookPair(DSDVRouteTable *o, unsigned int _ip) : obj(o), ip(_ip) { }
-  private:
+  protected:
     HookPair() { }
   };
 
@@ -438,7 +440,7 @@ private:
 
   Timer _log_dump_timer;
   static void static_log_dump_hook(Timer *, void *e) { ((DSDVRouteTable *) e)->log_dump_hook(true); }
-  void log_dump_hook(bool reschedule);
+  virtual void log_dump_hook(bool reschedule);
 
 
   static void static_expire_hook(Timer *, void *v)
@@ -451,11 +453,11 @@ private:
 
   void trigger_hook(const IPAddress &);
 
-  void send_full_update();
-  void send_triggered_update(const IPAddress &);
+  virtual void send_full_update();
+  virtual void send_triggered_update(const IPAddress &);
 
   /* send a route advertisement containing the specified entries */
-  void build_and_tx_ad(Vector<RTEntry> &);
+  virtual void build_and_tx_ad(Vector<RTEntry> &);
   int max_rtes_per_ad() const {
     int hdr_sz = sizeof(click_ether) + sizeof(grid_hdr) + sizeof(grid_hello);
     return ((_mtu - hdr_sz) / sizeof(grid_nbr_entry));
@@ -471,14 +473,14 @@ public:
   static unsigned int msec_to_jiff(unsigned int m)
   { return (CLICK_HZ * m) / 1000; }
 
-private:
+protected:
   class RouteEntry make_generic_rte(const RTEntry &rte) { return rte; }
 
   /* update route metric with the last hop from the advertising node */
   void update_metric(RTEntry &);
 
   /* initialize the metric for a 1-hop neighbor */
-  void init_metric(RTEntry &);
+  virtual void init_metric(RTEntry &);
 
   /* update weight settling time */
   void update_wst(RTEntry *old_r, RTEntry &new_r, const unsigned int jiff);
@@ -549,10 +551,12 @@ private:
 inline unsigned
 dsdv_jiffies()
 {
-  static unsigned last_click_jiffies = 0;
+  //static unsigned last_click_jiffies = 0;
   unsigned j = click_jiffies();
-  assert(j >= last_click_jiffies);
-  last_click_jiffies = j;
+  //click_chatter("jiff check - now %u: last %u", j, last_click_jiffies );
+  //assert(j >= last_click_jiffies); BB - killing this assert, as the timing is only relevant per instance
+  //    and this gets changed by all instances
+  //last_click_jiffies = j;
   return j;
 }
 
