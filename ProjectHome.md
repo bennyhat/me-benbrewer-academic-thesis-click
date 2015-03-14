@@ -1,0 +1,1 @@
+Click implementation of Drave's ETT and modification per thesis. An actual implementation of Drave's ETT (vs. the other derivative used in Click roofnet SR2) an a modification of it to use UP 7 for control.
